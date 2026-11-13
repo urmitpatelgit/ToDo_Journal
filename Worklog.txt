@@ -1,0 +1,13 @@
+Quick Reference Cheatsheet for Future Updates & Apps
+
+Keep these three commands handy whenever you update your journal features or launch ://urmitp.com and ://urmitp.com:
+• Updating ToDo_Journal Later:
+	1. On your Windows PC: docker build --platform linux/amd64 -t todo-journal:latest . then docker save -o todo-journal.tar todo-journal:latest.
+	2. Upload todo-journal.tar via the GCP Browser SSH Upload file button (works with zero external IP via Google IAP).
+	3. On your VM: sudo docker load -i ~/todo-journal.tar && rm ~/todo-journal.tar && cd /opt/apps && sudo docker compose up -d.
+• Adding reservation or ticket Apps Later:
+	1. Add their frontend (nginx:alpine) and backend containers with mem_limit caps to /opt/apps/docker-compose.yml.
+	2. In Cloudflare Zero Trust > Networks > Tunnels > Routes, add api/* -> http://<backend>:<port> first, followed by the catch-all frontend route -> http://<frontend>:80.
+• Checking Container Health & Memory Anytime:
+	• Run sudo docker compose ps or free -h inside /opt/apps to monitor RAM usage across your apps.
+Enjoy your new $0/month cloud setup at https://todo-gcp.urmitp.com! Feel free to reach out whenever you are ready to build and containerize your reservation or ticketing apps.
