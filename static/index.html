@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Personal Task Manager</title>
+  <link id="app-favicon" rel="icon" type="image/jpeg" href="/logo-light.jpg">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              300: '#a5b4fc',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone for in-browser JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Smooth transitions for theme toggle & layout shifts */
+    * {
+      transition-property: background-color, border-color, color, fill, stroke;
+      transition-duration: 150ms;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .dark .custom-scroll::-webkit-scrollbar-thumb {
+      background: #334155;
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-50 text-slate-800 antialiased selection:bg-brand-500 selection:text-white dark:bg-slate-950 dark:text-slate-100 font-sans">
+  <div id="root" class="min-h-full flex flex-col"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+
+    // --- ICONS (Zero external dependency SVG icons) ---
+    const IconSun = () => (
+      <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>
+    );
+
+    const IconMoon = () => (
+      <svg className="w-5 h-5 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+      </svg>
+    );
+
+    const IconPlus = () => (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+      </svg>
+    );
+
+    const IconCheck = () => (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+    );
+
+    const IconEdit = () => (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      </svg>
+    );
+
+    const IconTrash = () => (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+      </svg>
+    );
+
+    const IconLogOut = () => (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+      </svg>
+    );
+
+    const IconSearch = () => (
+      <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    );
+
+    const IconWarning = () => (
+      <svg className="w-6 h-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    );
+
+    const IconSparkles = () => (
+      <svg className="w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      </svg>
+    );
+
+    const IconCalendar = () => (
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    );
+
+    const IconClock = () => (
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    );
+
+    const formatDateTime = (dateStr) => {
+      if (!dateStr) return '';
+      const d = new Date(dateStr.replace(' ', 'T'));
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    };
+
+    const isOverdue = (todo) => {
+      if (!todo.reminder_at || todo.completed) return false;
+      const d = new Date(todo.reminder_at.replace(' ', 'T'));
+      return !isNaN(d.getTime()) && d < new Date();
+    };
+
+    // --- API CLIENT ---
+    const API = {
+      getToken: () => localStorage.getItem('taskflow_token'),
+      setToken: (token) => localStorage.setItem('taskflow_token', token),
+      removeToken: () => localStorage.removeItem('taskflow_token'),
+
+      request: async (url, options = {}) => {
+        const token = API.getToken();
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          ...options.headers,
+        };
+
+        const res = await fetch(url, { ...options, headers });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(data.error || `Request failed with status ${res.status}`);
+        }
+        return data;
+      },
+
+      register: (userData) => API.request('/api/auth/register', { method: 'POST', body: JSON.stringify(userData) }),
+      login: (credentials) => API.request('/api/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
+      getMe: () => API.request('/api/auth/me'),
+      getTodos: () => API.request('/api/todos'),
+      createTodo: (todo) => API.request('/api/todos', { method: 'POST', body: JSON.stringify(todo) }),
+      updateTodo: (id, updates) => API.request(`/api/todos/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
+      deleteTodo: (id) => API.request(`/api/todos/${id}`, { method: 'DELETE' }),
+    };
+
+    // --- APP ROOT COMPONENT ---
+    function App() {
+      // Theme State (synced with localStorage & html class)
+      const [theme, setTheme] = useState(() => {
+        const saved = localStorage.getItem('taskflow_theme');
+        if (saved) return saved;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      });
+
+      useEffect(() => {
+        const root = document.documentElement;
+        const favicon = document.getElementById('app-favicon');
+        if (theme === 'dark') {
+          root.classList.add('dark');
+          if (favicon) favicon.href = '/logo-dark.jpg';
+        } else {
+          root.classList.remove('dark');
+          if (favicon) favicon.href = '/logo-light.jpg';
+        }
+        localStorage.setItem('taskflow_theme', theme);
+      }, [theme]);
+
+      const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+      const currentLogo = theme === 'dark' ? '/logo-dark.jpg' : '/logo-light.jpg';
+
+      // Auth State
+      const [user, setUser] = useState(null);
+      const [authLoading, setAuthLoading] = useState(true);
+
+      // Verify Session on mount
+      useEffect(() => {
+        const checkAuth = async () => {
+          const token = API.getToken();
+          if (!token) {
+            setAuthLoading(false);
+            return;
+          }
+          try {
+            const data = await API.getMe();
+            setUser(data.user);
+          } catch (err) {
+            console.warn('Session expired or invalid:', err);
+            API.removeToken();
+            setUser(null);
+          } finally {
+            setAuthLoading(false);
+          }
+        };
+        checkAuth();
+      }, []);
+
+      const handleLoginSuccess = (authData) => {
+        API.setToken(authData.token);
+        setUser(authData.user);
+      };
+
+      const handleLogout = () => {
+        API.removeToken();
+        setUser(null);
+      };
+
+      if (authLoading) {
+        return (
+          <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+            <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Loading Personal Task Manager...</p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/80">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="bg-slate-100 dark:bg-black p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center">
+                  <img src={currentLogo} alt="Logo" className="h-7 sm:h-8 w-auto object-contain rounded-md" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
+                    Personal Task Manager
+                  </h1>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Secure &amp; Persistent To-Do System</p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                {/* Theme Toggle Button */}
+                <button
+                  onClick={toggleTheme}
+                  title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+                  className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                >
+                  {theme === 'dark' ? <IconSun /> : <IconMoon />}
+                </button>
+
+                {user && (
+                  <div className="flex items-center space-x-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+                    <div className="hidden sm:flex flex-col text-right">
+                      <span className="text-xs font-semibold text-slate-900 dark:text-white leading-tight">{user.name}</span>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">{user.email}</span>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-sm shadow-inner uppercase">
+                      {user.name.charAt(0)}
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      title="Sign Out"
+                      className="p-2 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors"
+                    >
+                      <IconLogOut />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* Main Body */}
+          <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8">
+            {!user ? (
+              <AuthCard onLoginSuccess={handleLoginSuccess} theme={theme} />
+            ) : (
+              <TodoDashboard user={user} />
+            )}
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-slate-200 py-4 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500">
+            Personal Task Manager &copy; 2026 &bull; React + Tailwind CSS + Go SQLite Backend
+          </footer>
+        </div>
+      );
+    }
+
+    // --- AUTHENTICATION COMPONENT ---
+    function AuthCard({ onLoginSuccess, theme }) {
+      const [isSignUp, setIsSignUp] = useState(false);
+      const currentLogo = theme === 'dark' ? '/logo-dark.jpg' : '/logo-light.jpg';
+      const [formData, setFormData] = useState({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+      });
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+        if (error) setError('');
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+
+        if (isSignUp) {
+          if (!formData.name.trim()) return setError('Please enter your full name.');
+          if (formData.password.length < 6) return setError('Password must be at least 6 characters.');
+          if (formData.password !== formData.confirmPassword) return setError('Passwords do not match.');
+        }
+
+        setLoading(true);
+        try {
+          let data;
+          if (isSignUp) {
+            data = await API.register({
+              name: formData.name.trim(),
+              email: formData.email.trim(),
+              password: formData.password
+            });
+          } else {
+            data = await API.login({
+              email: formData.email.trim(),
+              password: formData.password
+            });
+          }
+          onLoginSuccess(data);
+        } catch (err) {
+          setError(err.message || 'Authentication failed. Please check your credentials.');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const fillDemo = async () => {
+        setLoading(true);
+        setError('');
+        try {
+          const data = await API.login({
+            email: 'demo@example.com',
+            password: 'demo123'
+          });
+          onLoginSuccess(data);
+        } catch (err) {
+          setError('Demo login error: ' + err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="max-w-md mx-auto my-8">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-slate-950/60 border border-slate-200/80 dark:border-slate-800 p-8">
+            {/* Header / Tabs */}
+            <div className="text-center mb-8">
+              <div className="inline-block p-2 rounded-2xl bg-slate-100 dark:bg-black border border-slate-200 dark:border-slate-800 shadow-md mb-4">
+                <img src={currentLogo} alt="Logo" className="h-10 sm:h-12 w-auto mx-auto object-contain rounded-lg" />
+              </div>
+              <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                {isSignUp ? 'Create your account' : 'Sign in to Task Manager'}
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {isSignUp ? 'Sign up to start organizing tasks across devices' : 'Access your personal tasks from any device'}
+              </p>
+
+              {/* Tab Selector */}
+              <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl mt-6">
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(false); setError(''); }}
+                  className={`py-2 text-sm font-semibold rounded-lg transition-all ${
+                    !isSignUp
+                      ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUp(true); setError(''); }}
+                  className={`py-2 text-sm font-semibold rounded-lg transition-all ${
+                    isSignUp
+                      ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  Sign Up
+                </button>
+              </div>
+            </div>
+
+            {/* Error Banner */}
+            {error && (
+              <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-sm dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300 flex items-start gap-3">
+                <IconWarning />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {isSignUp && (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="Alex Morgan"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="alex@example.com"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Minimum 6 characters"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
+                />
+              </div>
+
+              {isSignUp && (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                    Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    required
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Repeat password"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-sm"
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 active:scale-[0.99] shadow-lg shadow-brand-500/25 transition-all disabled:opacity-50 text-sm mt-2 flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <span>{isSignUp ? 'Create My Account' : 'Sign in to Task Manager'}</span>
+                )}
+              </button>
+            </form>
+
+            {/* Quick Demo Login Option */}
+            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Want to test right away without typing?</p>
+              <button
+                type="button"
+                onClick={fillDemo}
+                disabled={loading}
+                className="inline-flex items-center justify-center gap-2 text-xs font-semibold py-2 px-4 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-300 transition-all shadow-sm"
+              >
+                <span>⚡ 1-Click Demo Login</span>
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono">(demo@example.com)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- TODO DASHBOARD ---
+    function TodoDashboard({ user }) {
+      const [todos, setTodos] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [filterTab, setFilterTab] = useState('all'); // 'all', 'active', 'completed'
+      const [filterPriority, setFilterPriority] = useState('all'); // 'all', 'high', 'medium', 'low'
+      const [filterDate, setFilterDate] = useState('all'); // 'all', 'today', 'upcoming', 'overdue', 'custom'
+      const [customDate, setCustomDate] = useState('');
+      
+      // Inline editing state
+      const [editingId, setEditingId] = useState(null);
+      const [editingText, setEditingText] = useState('');
+      const [editingPriority, setEditingPriority] = useState('medium');
+      const [editingReminder, setEditingReminder] = useState('');
+
+      // Delete confirmation modal state
+      const [deleteTarget, setDeleteTarget] = useState(null);
+      const [isDeleting, setIsDeleting] = useState(false);
+
+      // Fetch Tasks
+      const loadTodos = async () => {
+        try {
+          const data = await API.getTodos();
+          setTodos(data);
+        } catch (err) {
+          console.error('Failed to load tasks:', err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      useEffect(() => {
+        loadTodos();
+      }, []);
+
+      // Auto-sort algorithm:
+      // Active tasks (completed === false) stay at top (newest first).
+      // Completed tasks (completed === true) sink automatically to the bottom.
+      const sortedTodos = useMemo(() => {
+        return [...todos].sort((a, b) => {
+          if (a.completed !== b.completed) {
+            return a.completed ? 1 : -1;
+          }
+          return new Date(b.created_at) - new Date(a.created_at);
+        });
+      }, [todos]);
+
+      // Filtered view
+      const filteredTodos = useMemo(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+
+        return sortedTodos.filter(item => {
+          // 1. Text Search
+          if (searchQuery) {
+            const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
+            if (!matchesSearch) return false;
+          }
+
+          // 2. Status Filter
+          if (filterTab === 'active' && item.completed) return false;
+          if (filterTab === 'completed' && !item.completed) return false;
+
+          // 3. Priority Filter
+          if (filterPriority !== 'all' && (item.priority || 'medium') !== filterPriority) {
+            return false;
+          }
+
+          // 4. Date Filter
+          if (filterDate === 'today') {
+            const remDate = item.reminder_at ? item.reminder_at.slice(0, 10) : '';
+            const compDate = item.completed_at ? item.completed_at.slice(0, 10) : '';
+            const creatDate = item.created_at ? item.created_at.slice(0, 10) : '';
+            if (remDate !== todayStr && compDate !== todayStr && creatDate !== todayStr) {
+              return false;
+            }
+          } else if (filterDate === 'upcoming') {
+            if (!item.reminder_at || item.completed) return false;
+            const rDate = new Date(item.reminder_at.replace(' ', 'T'));
+            if (isNaN(rDate.getTime()) || rDate <= now) return false;
+          } else if (filterDate === 'overdue') {
+            if (!item.reminder_at || item.completed) return false;
+            const rDate = new Date(item.reminder_at.replace(' ', 'T'));
+            if (isNaN(rDate.getTime()) || rDate >= now) return false;
+          } else if (filterDate === 'custom' && customDate) {
+            const remDate = item.reminder_at ? item.reminder_at.slice(0, 10) : '';
+            const compDate = item.completed_at ? item.completed_at.slice(0, 10) : '';
+            const creatDate = item.created_at ? item.created_at.slice(0, 10) : '';
+            if (remDate !== customDate && compDate !== customDate && creatDate !== customDate) {
+              return false;
+            }
+          }
+
+          return true;
+        });
+      }, [sortedTodos, searchQuery, filterTab, filterPriority, filterDate, customDate]);
+
+      // Statistics
+      const totalCount = todos.length;
+      const completedCount = todos.filter(t => t.completed).length;
+      const percentComplete = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+      // Add Task
+      const handleAddTodo = async (title, priority, reminderAt) => {
+        try {
+          const payload = { title, priority };
+          if (reminderAt) payload.reminder_at = reminderAt;
+          const newTodo = await API.createTodo(payload);
+          // Optimistically prepend to active items
+          setTodos(prev => [newTodo, ...prev]);
+        } catch (err) {
+          alert('Failed to add task: ' + err.message);
+        }
+      };
+
+      // Toggle Completion (Auto-moves completed items to the bottom & records completed_at timestamp)
+      const handleToggleComplete = async (todo) => {
+        const nextCompleted = !todo.completed;
+        const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 19);
+        const nextCompletedAt = nextCompleted ? nowStr : null;
+
+        // Optimistic update
+        setTodos(prev => prev.map(t => t.id === todo.id ? {
+          ...t,
+          completed: nextCompleted,
+          completed_at: nextCompletedAt
+        } : t));
+        
+        try {
+          await API.updateTodo(todo.id, { completed: nextCompleted });
+        } catch (err) {
+          console.error('Failed to sync completion:', err);
+          // Rollback on failure
+          setTodos(prev => prev.map(t => t.id === todo.id ? {
+            ...t,
+            completed: todo.completed,
+            completed_at: todo.completed_at
+          } : t));
+        }
+      };
+
+      // Inline Edit Controls
+      const startEditing = (todo) => {
+        setEditingId(todo.id);
+        setEditingText(todo.title);
+        setEditingPriority(todo.priority || 'medium');
+        setEditingReminder(todo.reminder_at ? todo.reminder_at.replace(' ', 'T').slice(0, 16) : '');
+      };
+
+      const cancelEditing = () => {
+        setEditingId(null);
+        setEditingText('');
+        setEditingReminder('');
+      };
+
+      const saveInlineEdit = async (id) => {
+        const trimmed = editingText.trim();
+        if (!trimmed) {
+          cancelEditing();
+          return;
+        }
+
+        const prev = todos.find(t => t.id === id);
+        const updatedReminder = editingReminder ? editingReminder.replace('T', ' ') : null;
+
+        // Optimistic update
+        setTodos(list => list.map(t => t.id === id ? {
+          ...t,
+          title: trimmed,
+          priority: editingPriority,
+          reminder_at: updatedReminder
+        } : t));
+        setEditingId(null);
+
+        try {
+          await API.updateTodo(id, {
+            title: trimmed,
+            priority: editingPriority,
+            reminder_at: editingReminder ? editingReminder.replace('T', ' ') : ''
+          });
+        } catch (err) {
+          console.error('Failed to update task:', err);
+          if (prev) {
+            setTodos(list => list.map(t => t.id === id ? prev : t));
+          }
+        }
+      };
+
+      // Delete Confirmation Action
+      const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
+        try {
+          await API.deleteTodo(deleteTarget.id);
+          setTodos(prev => prev.filter(t => t.id !== deleteTarget.id));
+          setDeleteTarget(null);
+        } catch (err) {
+          alert('Failed to delete task: ' + err.message);
+        } finally {
+          setIsDeleting(false);
+        }
+      };
+
+      const hasActiveFilters = searchQuery !== '' || filterTab !== 'all' || filterPriority !== 'all' || filterDate !== 'all' || customDate !== '';
+      const clearAllFilters = () => {
+        setSearchQuery('');
+        setFilterTab('all');
+        setFilterPriority('all');
+        setFilterDate('all');
+        setCustomDate('');
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Progress & Stats Bar */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Personal Task Manager Overview</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {completedCount} of {totalCount} tasks completed ({percentComplete}%)
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs font-medium">
+                <button
+                  onClick={() => setFilterTab('all')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    filterTab === 'all'
+                      ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-white font-semibold shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  All ({totalCount})
+                </button>
+                <button
+                  onClick={() => setFilterTab('active')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    filterTab === 'active'
+                      ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-white font-semibold shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Active ({totalCount - completedCount})
+                </button>
+                <button
+                  onClick={() => setFilterTab('completed')}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    filterTab === 'completed'
+                      ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-white font-semibold shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Completed ({completedCount})
+                </button>
+              </div>
+            </div>
+
+            {/* Gradient Progress Bar */}
+            <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-brand-500 via-indigo-500 to-emerald-500 transition-all duration-500 rounded-full"
+                style={{ width: `${percentComplete}%` }}
+              ></div>
+            </div>
+          </div>
+
+          {/* Add Todo Input Box with Reminder Date-Time Picker */}
+          <AddTodoBox onAdd={handleAddTodo} />
+
+          {/* Search & Advanced Filters */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+            {/* Search Bar */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <IconSearch />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks by title..."
+                className="w-full pl-10 pr-4 py-2 bg-slate-50/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 rounded-xl text-sm placeholder-slate-400 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Filter Toolbar: Priority & Date Filters */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
+              {/* Priority Filter */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-slate-500 dark:text-slate-400">Priority:</span>
+                <div className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 text-[11px] font-medium">
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'high', label: '🔴 High' },
+                    { id: 'medium', label: '🟡 Med' },
+                    { id: 'low', label: '🟢 Low' },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setFilterPriority(p.id)}
+                      className={`px-2 py-1 rounded-md transition-all ${
+                        filterPriority === p.id
+                          ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-white font-semibold shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date Filter */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-semibold text-slate-500 dark:text-slate-400">Date:</span>
+                <div className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800 text-[11px] font-medium">
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'today', label: '📅 Today' },
+                    { id: 'upcoming', label: '⏰ Upcoming' },
+                    { id: 'overdue', label: '⚠️ Overdue' },
+                  ].map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => { setFilterDate(d.id); setCustomDate(''); }}
+                      className={`px-2 py-1 rounded-md transition-all ${
+                        filterDate === d.id
+                          ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-white font-semibold shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Date Input */}
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(e) => {
+                    setCustomDate(e.target.value);
+                    if (e.target.value) setFilterDate('custom');
+                    else setFilterDate('all');
+                  }}
+                  title="Filter by specific date"
+                  className="px-2 py-1 text-[11px] rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none"
+                />
+
+                {/* Reset Filters Pill */}
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearAllFilters}
+                    className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline px-1.5"
+                  >
+                    Reset Filters
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Tasks List */}
+          {loading ? (
+            <div className="text-center py-12 text-slate-400 text-sm">
+              <div className="w-8 h-8 border-3 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+              Loading your tasks...
+            </div>
+          ) : filteredTodos.length === 0 ? (
+            <div className="text-center py-16 bg-white dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+              <div className="w-12 h-12 rounded-2xl bg-brand-50 dark:bg-brand-950/60 text-brand-500 flex items-center justify-center mx-auto mb-3 text-2xl">
+                📝
+              </div>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">No tasks match your filter</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto mt-1">
+                {hasActiveFilters
+                  ? "Try clearing your search query, priority, or date filters to see more tasks."
+                  : filterTab === 'completed'
+                  ? "No completed tasks yet. Finish a task to see it move down here!"
+                  : "You're all caught up! Add a new task above or press Enter."}
+              </p>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="mt-3 px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-400 border border-brand-200 dark:border-brand-800 hover:bg-brand-100 transition-all"
+                >
+                  Clear All Filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {filteredTodos.map((todo) => (
+                <TodoItem
+                  key={todo.id}
+                  todo={todo}
+                  onToggleComplete={() => handleToggleComplete(todo)}
+                  onDelete={() => setDeleteTarget(todo)}
+                  isEditing={editingId === todo.id}
+                  editingText={editingText}
+                  setEditingText={setEditingText}
+                  editingPriority={editingPriority}
+                  setEditingPriority={setEditingPriority}
+                  editingReminder={editingReminder}
+                  setEditingReminder={setEditingReminder}
+                  onStartEdit={() => startEditing(todo)}
+                  onCancelEdit={cancelEditing}
+                  onSaveEdit={() => saveInlineEdit(todo.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Delete Confirmation Modal */}
+          {deleteTarget && (
+            <DeleteModal
+              todo={deleteTarget}
+              isDeleting={isDeleting}
+              onConfirm={confirmDelete}
+              onCancel={() => setDeleteTarget(null)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // --- ADD TODO INPUT BOX WITH REMINDER DATE TIME ---
+    function AddTodoBox({ onAdd }) {
+      const [title, setTitle] = useState('');
+      const [priority, setPriority] = useState('medium');
+      const [reminderAt, setReminderAt] = useState('');
+      const [showReminderPicker, setShowReminderPicker] = useState(false);
+      const inputRef = useRef(null);
+
+      const handleSubmit = (e) => {
+        if (e) e.preventDefault();
+        const trimmed = title.trim();
+        if (!trimmed) return;
+        onAdd(trimmed, priority, reminderAt ? reminderAt.replace('T', ' ') : null);
+        setTitle('');
+        setReminderAt('');
+        setShowReminderPicker(false);
+        if (inputRef.current) inputRef.current.focus();
+      };
+
+      const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+          handleSubmit();
+        }
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+          <div className="flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="What needs to be done? Press Enter to add..."
+              className="flex-1 px-4 py-3 bg-slate-50/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700/80 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+            />
+            <button
+              type="submit"
+              disabled={!title.trim()}
+              className="px-5 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-medium text-sm shadow-md shadow-brand-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1.5"
+            >
+              <IconPlus />
+              <span className="hidden sm:inline">Add Task</span>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400 pt-1">
+            <div className="flex items-center gap-3">
+              {/* Priority Picker */}
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">Priority:</span>
+                <div className="inline-flex rounded-lg p-0.5 bg-slate-100 dark:bg-slate-800">
+                  {['low', 'medium', 'high'].map((p) => {
+                    const isSelected = priority === p;
+                    const colorClasses = {
+                      low: isSelected ? 'bg-emerald-500 text-white shadow-sm' : 'hover:text-emerald-600',
+                      medium: isSelected ? 'bg-amber-500 text-white shadow-sm' : 'hover:text-amber-600',
+                      high: isSelected ? 'bg-rose-500 text-white shadow-sm' : 'hover:text-rose-600',
+                    }[p];
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPriority(p)}
+                        className={`px-2.5 py-1 rounded-md capitalize font-medium transition-all ${colorClasses}`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Reminder Toggle & Picker */}
+              <div className="flex items-center gap-2">
+                {!showReminderPicker && !reminderAt ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowReminderPicker(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition-all"
+                  >
+                    <IconCalendar />
+                    <span>+ Add Reminder</span>
+                  </button>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-50 dark:bg-brand-950/60 border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-300 font-medium">
+                    <IconClock />
+                    <span className="font-semibold text-[11px]">Reminder:</span>
+                    <input
+                      type="datetime-local"
+                      value={reminderAt}
+                      onChange={(e) => setReminderAt(e.target.value)}
+                      className="bg-transparent text-[11px] text-slate-800 dark:text-slate-200 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => { setReminderAt(''); setShowReminderPicker(false); }}
+                      className="text-slate-400 hover:text-rose-600 font-bold ml-1 text-xs"
+                      title="Remove reminder"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <span className="text-[11px] text-slate-400 hidden sm:inline">Shortcut: Press ↵ Enter to save</span>
+          </div>
+        </form>
+      );
+    }
+
+    // --- TODO ITEM COMPONENT WITH INLINE EDIT, REMINDER & COMPLETION TIMESTAMPS ---
+    function TodoItem({
+      todo,
+      onToggleComplete,
+      onDelete,
+      isEditing,
+      editingText,
+      setEditingText,
+      editingPriority,
+      setEditingPriority,
+      editingReminder,
+      setEditingReminder,
+      onStartEdit,
+      onCancelEdit,
+      onSaveEdit
+    }) {
+      const editInputRef = useRef(null);
+
+      useEffect(() => {
+        if (isEditing && editInputRef.current) {
+          editInputRef.current.focus();
+          editInputRef.current.select();
+        }
+      }, [isEditing]);
+
+      const handleEditKeyDown = (e) => {
+        if (e.key === 'Enter') {
+          onSaveEdit();
+        } else if (e.key === 'Escape') {
+          onCancelEdit();
+        }
+      };
+
+      const priorityBadge = {
+        low: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+        medium: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+        high: 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border-rose-200 dark:border-rose-800',
+      }[todo.priority || 'medium'];
+
+      const overdue = isOverdue(todo);
+
+      return (
+        <div
+          className={`group flex items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all ${
+            todo.completed
+              ? 'bg-slate-100/70 dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-800/60 opacity-75'
+              : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 shadow-sm hover:border-brand-200 dark:hover:border-slate-700'
+          }`}
+        >
+          {/* Completion Checkbox */}
+          <button
+            type="button"
+            onClick={onToggleComplete}
+            title={todo.completed ? 'Mark incomplete' : 'Mark complete (moves to bottom)'}
+            className={`flex-shrink-0 w-6 h-6 mt-0.5 sm:mt-0 rounded-lg border flex items-center justify-center transition-all ${
+              todo.completed
+                ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                : 'border-slate-300 dark:border-slate-600 hover:border-brand-500 dark:hover:border-brand-400'
+            }`}
+          >
+            {todo.completed && <IconCheck />}
+          </button>
+
+          {/* Content / Inline Edit Field */}
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <div className="space-y-2">
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  value={editingText}
+                  onChange={(e) => setEditingText(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
+                  placeholder="Task title..."
+                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-brand-500 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none ring-1 ring-brand-500"
+                />
+                
+                {/* Inline Editing for Priority and Reminder */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                  {/* Priority selector */}
+                  <div className="inline-flex rounded-md p-0.5 bg-slate-100 dark:bg-slate-800">
+                    {['low', 'medium', 'high'].map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setEditingPriority(p)}
+                        className={`px-2 py-0.5 rounded capitalize text-[10px] font-semibold ${
+                          editingPriority === p
+                            ? 'bg-brand-600 text-white'
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Reminder input */}
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px]">
+                    <IconClock />
+                    <input
+                      type="datetime-local"
+                      value={editingReminder}
+                      onChange={(e) => setEditingReminder(e.target.value)}
+                      className="bg-transparent text-[11px] text-slate-800 dark:text-slate-200 focus:outline-none"
+                    />
+                    {editingReminder && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingReminder('')}
+                        className="text-slate-400 hover:text-rose-600 text-[10px]"
+                        title="Clear reminder"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={onSaveEdit}
+                    title="Save changes"
+                    className="p-1 px-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-medium text-xs flex items-center gap-1 shadow-sm"
+                  >
+                    <IconCheck /> Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onCancelEdit}
+                    title="Cancel"
+                    className="p-1 px-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-xs font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                onDoubleClick={onStartEdit}
+                title="Double-click to edit inline"
+                className="cursor-pointer select-none space-y-1"
+              >
+                <div
+                  className={`text-sm break-words transition-all ${
+                    todo.completed
+                      ? 'line-through text-slate-400 dark:text-slate-500'
+                      : 'text-slate-800 dark:text-slate-100 font-medium'
+                  }`}
+                >
+                  {todo.title}
+                </div>
+
+                {/* Badges: Reminder Date Time & Completion Date Time */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  {/* Reminder Date Time */}
+                  {todo.reminder_at && (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                        overdue
+                          ? 'bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/50 dark:border-rose-900 dark:text-rose-300 animate-pulse'
+                          : 'bg-brand-50 border-brand-200 text-brand-700 dark:bg-brand-950/50 dark:border-brand-800 dark:text-brand-300'
+                      }`}
+                    >
+                      <IconClock />
+                      <span>{overdue ? 'Overdue: ' : 'Reminder: '}</span>
+                      <span className="font-semibold">{formatDateTime(todo.reminder_at)}</span>
+                    </span>
+                  )}
+
+                  {/* Completion Date Time */}
+                  {todo.completed && todo.completed_at && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/50 dark:border-emerald-800 dark:text-emerald-300">
+                      <IconCheck />
+                      <span>Done: </span>
+                      <span className="font-semibold">{formatDateTime(todo.completed_at)}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Priority Pill & Action Buttons */}
+          {!isEditing && (
+            <div className="flex items-center gap-2 flex-shrink-0 mt-0.5 sm:mt-0">
+              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${priorityBadge}`}>
+                {todo.priority || 'medium'}
+              </span>
+
+              <div className="flex items-center opacity-70 group-hover:opacity-100 transition-opacity">
+                {/* Inline Edit Trigger */}
+                <button
+                  type="button"
+                  onClick={onStartEdit}
+                  title="Edit task text & reminder inline"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-brand-400 transition-all"
+                >
+                  <IconEdit />
+                </button>
+
+                {/* Delete Trigger */}
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  title="Delete task"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-all"
+                >
+                  <IconTrash />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // --- DELETE CONFIRMATION MODAL ---
+    function DeleteModal({ todo, isDeleting, onConfirm, onCancel }) {
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          if (e.key === 'Escape') onCancel();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [onCancel]);
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
+              <IconWarning />
+            </div>
+
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete this task?</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 break-words">
+                Are you sure you want to delete <span className="font-semibold text-slate-700 dark:text-slate-200">"{todo.title}"</span>? This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={isDeleting}
+                className="py-2.5 px-4 rounded-xl font-medium text-xs text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                disabled={isDeleting}
+                className="py-2.5 px-4 rounded-xl font-medium text-xs text-white bg-rose-600 hover:bg-rose-700 active:scale-95 shadow-md shadow-rose-600/20 transition-all flex items-center justify-center gap-1.5"
+              >
+                {isDeleting ? (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                ) : (
+                  <span>Delete Task</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Render the App
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
