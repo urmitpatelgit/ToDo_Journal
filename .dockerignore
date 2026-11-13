@@ -1,0 +1,13 @@
+# .dockerignore
+# Exclude binaries and local data
+*.exe
+*.db
+*.db-wal
+*.db-shm
+*.log
+# Git files
+.git
+.gitignore
+# Dockerfile itself not needed in runtime but okay
+# Build artefacts
+/tmp
